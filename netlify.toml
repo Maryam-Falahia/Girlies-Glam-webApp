@@ -1,0 +1,12 @@
+[build]
+  command = "PORT=8080 BASE_PATH=/ pnpm --filter @workspace/girlies-glam run build"
+  publish = "artifacts/girlies-glam/dist/public"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PNPM_VERSION = "9.15.9"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
