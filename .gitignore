@@ -55,3 +55,6 @@ Thumbs.db
 
 # Netlify CLI local state
 .netlify/
+netlify/functions/*.mjs
+netlify/functions/*.map
+artifacts/girlies-glam/netlify/

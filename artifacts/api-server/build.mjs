@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { copyFile, mkdir, rm } from "node:fs/promises";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -12,6 +12,8 @@ const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
+  const functionsDir = path.resolve(artifactDir, "..", "..", "netlify", "functions");
+  const packageFunctionsDir = path.resolve(artifactDir, "..", "girlies-glam", "netlify", "functions");
   await rm(distDir, { recursive: true, force: true });
 
   await esbuild({
@@ -118,6 +120,33 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  await esbuild({
+    entryPoints: [path.resolve(artifactDir, "src/lambda.ts")],
+    platform: "node",
+    bundle: true,
+    format: "esm",
+    outfile: path.resolve(functionsDir, "api.mjs"),
+    logLevel: "info",
+    external: ["*.node", "pg-native"],
+    sourcemap: false,
+    banner: {
+      js: `import { createRequire as __bannerCrReq } from 'node:module';
+import __bannerPath from 'node:path';
+import __bannerUrl from 'node:url';
+
+globalThis.require = __bannerCrReq(import.meta.url);
+globalThis.__filename = __bannerUrl.fileURLToPath(import.meta.url);
+globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
+    `,
+    },
+  });
+
+  await mkdir(packageFunctionsDir, { recursive: true });
+  await copyFile(
+    path.resolve(functionsDir, "api.mjs"),
+    path.resolve(packageFunctionsDir, "api.mjs"),
+  );
 }
 
 buildAll().catch((err) => {
