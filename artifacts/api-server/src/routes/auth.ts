@@ -1,0 +1,14 @@
+import { Router, type IRouter } from "express";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { RegisterBody, LoginBody, RegisterResponse, LoginResponse, LogoutResponse, GetMeResponse } from "@workspace/api-zod";
+import { hashPassword, verifyPassword, getUserId } from "../lib/auth";
+const router: IRouter = Router();
+const publicUser = (u: typeof usersTable.$inferSelect) => ({ id: String(u.id), name: u.name, email: u.email, initials: u.initials, isAdmin: u.isAdmin });
+const isProd = process.env.NODE_ENV === "production";
+const cookieOpts = { signed: true, httpOnly: true, sameSite: (isProd ? "none" : "lax") as "none"|"lax", secure: isProd, maxAge: 7*24*60*60*1000 };
+router.post("/auth/register", async (req, res): Promise<void> => { const parsed=RegisterBody.safeParse(req.body); if(!parsed.success){res.status(400).json({error:parsed.error.message});return;} const {name,email,password}=parsed.data; const [existing]=await db.select().from(usersTable).where(eq(usersTable.email,email.toLowerCase())); if(existing){res.status(409).json({error:"Email already in use"});return;} const initials=name.trim().split(" ").map((p:string)=>p[0]).join("").slice(0,2).toUpperCase()||"GG"; const [user]=await db.insert(usersTable).values({name:name.trim(),email:email.toLowerCase(),passwordHash:hashPassword(password),initials}).returning(); res.cookie("gg_session",String(user.id),cookieOpts); res.json({user:publicUser(user)}); });
+router.post("/auth/login", async (req,res):Promise<void>=>{const parsed=LoginBody.safeParse(req.body);if(!parsed.success){res.status(400).json({error:parsed.error.message});return;}const [user]=await db.select().from(usersTable).where(eq(usersTable.email,parsed.data.email.toLowerCase()));if(!user||!verifyPassword(parsed.data.password,user.passwordHash)){res.status(401).json({error:"Invalid email or password"});return;}res.cookie("gg_session",String(user.id),cookieOpts);res.json({user:publicUser(user)});});
+router.post("/auth/logout", async (_req,res):Promise<void>=>{res.clearCookie("gg_session");res.json(LogoutResponse.parse({ok:true}));});
+router.get("/auth/me", async (req,res):Promise<void>=>{const id=getUserId(req);if(!id){res.status(401).json({error:"Not authenticated"});return;}const [user]=await db.select().from(usersTable).where(eq(usersTable.id,id));if(!user){res.clearCookie("gg_session");res.status(401).json({error:"Not authenticated"});return;}res.json(publicUser(user));});
+export default router;

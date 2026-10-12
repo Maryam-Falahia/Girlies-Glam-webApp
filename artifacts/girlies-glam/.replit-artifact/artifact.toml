@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Girlies Glam"
+version = "1.0.0"
+id = "artifacts/girlies-glam"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19261
+
+[services.development]
+run = "pnpm --filter @workspace/girlies-glam run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/girlies-glam", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/girlies-glam/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19261"
+BASE_PATH = "/"
